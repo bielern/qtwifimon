@@ -17,48 +17,42 @@ import os       # For creating nice file paths
 import shutil   # For copy()
 import argparse # for parsing the arguments
 import logging  # For the debug messages
-#logging.basicConfig(level=logging.DEBUG)  # and turn them off
 
 from PyQt4 import QtGui, QtCore
 
-
-# print verbose
-#def v_print(message):
-#    if conf.verbose == True:
-#        print(message)
-
-
 class Conf:
     """All the configurations"""
-    #def __init__(self):
     # We have to initialize after having parsed the arguments
     def init(self):
-        #self.debug = False
-        self.verbose = False
         self.interface = "no interface assigned!"
         self.percentage = -1
         self.interval = 1
+        self.wired_file = "/sys/class/net/eth0/operstate"
         self.statfile = "/proc/net/wireless"
         #self.statfile = "test_wlan"
-        #self.statfile = "test_nowlan"
+        self.statfile = "test_nowlan"
         self.iconPath = "./img/"
         #self.iconPath = "img/"
-        #self.devfile = "/proc/net/dev"
+        self.devfile = "/proc/net/dev"
         #self.interfaces = []
         #self.monitor_wired = False
         self.parse_conf_file()
+        self.get_interfaces()
 
-    #def get_interfaces(self):
-    #    with open(self.devfile) as f:
-    #        f.readline()
-    #        f.readline()
-
-    #        while line = f.readline:
-    #            match = re.match("(\S+):", line)
-    #            if match.group(1) != "lo":
-    #                self.interfaces.append(match.group(1))
-
-    #    f.close()
+    def get_interfaces(self):
+        interfaces = []
+        with open(self.devfile) as f:
+            f.readline()
+            f.readline()
+            line = f.readline()
+            while line:
+                match = re.search("(\S+):", line)
+                if match.group(1) != "lo":
+                    interfaces.append(match.group(1))
+                line = f.readline()
+        f.close()
+        self.interfaces = set(interfaces)
+        logging.debug("Interfaces found: " + str(self.interfaces))
 
     def print_parser_err(self, option, value):
         print("Unknown value %s for option %s" % (value, option))
@@ -95,22 +89,6 @@ class Conf:
                         option = raw_option.strip()
                         value = raw_value.strip()
                         logging.debug("Option: %s; Value: %s" % (option, value))
-                        #if option == "debug":
-                        #    if value == "true" or value == "1":
-                        #        self.debug = True
-                        #        #logging.basicConfig(level=logging.DEBUG)
-                        #    elif value == "false" or value == "0":
-                        #        self.debug = False
-                        #        #logging.basicConfig(level=logging.WARNING)
-                        #    else:
-                        #        self.print_parser_err(option, value)
-                        #elif option == "verbose":
-                        #    if value == "true" or value == "1":
-                        #        self.verbose = True
-                        #    elif value == "false" or value == "0":
-                        #        self.verbose = False
-                        #    else:
-                        #        self.print_parser_err(option, value)
                         if option == "interval":
                             number = re.sub("[^0-9]*", "", value)
                             logging.debug("Number: %s" % number)
@@ -123,17 +101,13 @@ class Conf:
                                 self.iconPath = value
                             else:
                                 print("Path %s does not exist!" % value)
-                                #exit(1)
+                                exit(1)
                         else:
                             print("Unkown option %s" % option)
                             
                 raw_line = f.readline()
 
         f.close()
-        #if self.debug:
-        #    logging.basicConfig(level=logging.DEBUG)
-        #else:
-        #    logging.basicConfig()
 
 
 class WifiMonitor(QtCore.QObject):
@@ -145,6 +119,7 @@ class WifiMonitor(QtCore.QObject):
         self.timer.setInterval(conf.interval * 1000)
         self.timer.timeout.connect(self.update_status)
         self.start()
+        self.wifi_last = True # last working connection
         logging.debug("Constructed WifiMonitor")
 
     def start(self):
@@ -155,6 +130,13 @@ class WifiMonitor(QtCore.QObject):
 
     # Read in the satus of the connection
     def update_status(self):
+        """Retrieves the status of the connections
+
+        In the end a signal is emitted with the percentage, the interface
+        and the essid. If wifi is detected, percentage >= 0.  If not, 
+        percentage = -1. However, if a wired connection is found, interface
+        will be "eth0" and essid either "up" or "down". Wheter we have wired
+        down or wifi depends on the last connection."""
         logging.debug("I will update the status")
         percentage = -1
         interface = ""
@@ -163,19 +145,34 @@ class WifiMonitor(QtCore.QObject):
             f.readline()
             f.readline()
             line = f.readline()
+        f.close()
 
-        if line:
+        if line: # wifi
             logging.debug(line)
             m = re.search("(\S+\d):[ ]+(\d+)[ ]+(\d+)\.", line)
             interface = m.group(1)
             percentage = int(m.group(3))
-    
-        f.close()
+            self.wifi_last = True
 
-        command = "iwlist " + interface
-        command = command + " scanning | grep ESSID | cut -d'\"' -f2"
-        stdout_handle = os.popen(command)
-        essid = stdout_handle.read().strip()
+            command = "iwlist " + interface
+            command = command + " scanning | grep ESSID | cut -d'\"' -f2"
+            stdout_handle = os.popen(command)
+            essid = stdout_handle.read().strip()
+        else: # no wifi
+            logging.debug("No Wifi found")
+            with open(conf.wired_file) as f:
+                essid = f.readline().strip()
+                if "eth0" in conf.interfaces:
+                    interface = "eth0"
+                    logging.debug("eth0 exists")
+            f.close()
+
+            if essid == "up":
+                self.wifi_last = False
+            elif self.wifi_last and essid == "down":
+                interface = ""
+    
+        logging.debug(interface + ": " + essid + " @ " + str(percentage) + "%")
         self.signal_display_status.emit(percentage, interface, essid)
         
 
@@ -196,14 +193,7 @@ class WifiStatusIcon(QtGui.QSystemTrayIcon):
         self.trayIconMenu.addAction(self.quitAction)
         self.setContextMenu(self.trayIconMenu)
         pathToIcon = conf.iconPath + "wifi_none.svg"
-        print("will set icon")
-        try:
-            self.setIcon(QtGui.QIcon(pathToIcon))
-        except:
-            print("Icon not found")
-            #exit(1)
-            self.instance().quit()
-        print("icon set")
+        self.setIcon(QtGui.QIcon(pathToIcon))
 
     def show_wifi_status(self, percentage, interface, essid):
         if percentage >= 0:
@@ -218,9 +208,24 @@ class WifiStatusIcon(QtGui.QSystemTrayIcon):
             self.message = self.message + str(percentage) + "%"
         else:
             logging.info("No wifi connection detected!")
-            pathToIcon = os.path.join(conf.iconPath, "wifi_none.svg")
-            self.message = "Not connected to any wifi"
+            if interface == "eth0":
+                if essid == "up":
+                    pathToIcon = os.path.join(conf.iconPath, "wired.svg")
+                    self.message = "Wired connection"
+                elif essid == "down":
+                    pathToIcon = os.path.join(conf.iconPath, "wired_none.svg")
+                    self.message = "No wired connection"
+                else:
+                    pathToIcon = os.path.join(conf.iconPath, "wifi_none.svg")
+                    self.message = "Could not determine connection type"
+                    logging.error("Could not determine the connection type")
+            else:
+                pathToIcon = os.path.join(conf.iconPath, "wifi_none.svg")
+                self.message = "Not connected to any wifi"
     
+        if not os.path.isfile(pathToIcon):
+            self.quitAction.triggered.emit(True)
+
         self.setIcon(QtGui.QIcon(pathToIcon))
         self.setToolTip(self.message)
         logging.debug("Will display icon: " + pathToIcon)
@@ -280,10 +285,9 @@ class WifiMonitorApplication(QtGui.QApplication):
             elif args.verbose == "info":
                 logging.basicConfig(level=logging.INFO)
             elif args.verbose == "debug":
-                print("debug")
                 logging.basicConfig(level=logging.DEBUG)
 
-        print(args)
+        logging.info("Arguments: " + str(args))
 
 
 def signal_int_handler(signal, frame):
@@ -295,3 +299,5 @@ if (__name__ == "__main__"):
     signal.signal(signal.SIGINT, signal_int_handler)
     logging.debug("Start GUI")
     app.exec_()
+
+# eof
