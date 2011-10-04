@@ -1,5 +1,3 @@
-#! /usr/bin/python
-# 
 # wifimon 
 # Copyright by Noah Bieler
 #
@@ -8,10 +6,10 @@
 wifimon monitors your wifi connection and sits in your systray
 """
 
-__license__ = 'GLP3'
-__version__ = '0.5'
-__author__ = 'Noah Bieler'
-__email__ = 'noah[dot]bieler<at>gmx[dot]ch'
+#__license__ = 'GLP3'
+#__version__ = '0.5'
+#__author__ = 'Noah Bieler'
+#__email__ = 'noah[dot]bieler<at>gmx[dot]ch'
 
 # Imports
 import re       # regular expression
@@ -76,7 +74,8 @@ class Conf:
 
         if not os.path.isfile(self.conf_file):
             logging.debug("Will copy default configuration file")
-            shutil.copy("./default_config", self.conf_file)
+            def_conf_path = os.path.join(self.wifiMon_path, "default_config")
+            shutil.copy(def_conf_path, self.conf_file)
 
         with open(self.conf_file) as f:
             raw_line = f.readline()
@@ -114,6 +113,8 @@ class Conf:
                 raw_line = f.readline()
 
         f.close()
+
+conf = Conf()
 
 
 class WifiMonitor(QtCore.QObject):
@@ -296,14 +297,16 @@ class WifiMonitorApplication(QtGui.QApplication):
 
         logging.info("Arguments: " + str(args))
 
+    def signal_int_handler(self, signal, frame):
+        print("\nProgramm has been interrupted!")
+        self.instance().quit()
 
-def signal_int_handler(signal, frame):
-    app.instance().quit()
 
-if (__name__ == "__main__"):
-    conf = Conf()
+#if (__name__ == "__main__"):
+def main():
+    import wifimon
     app = WifiMonitorApplication(sys.argv)
-    signal.signal(signal.SIGINT, signal_int_handler)
+    signal.signal(signal.SIGINT, app.signal_int_handler)
     logging.debug("Start GUI")
     app.exec_()
 

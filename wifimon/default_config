@@ -1,0 +1,4 @@
+# Default Configuration for WifiMon
+interval = 1
+# If no custom icons are given, the default ones are used
+# icons = /path/to/icons
