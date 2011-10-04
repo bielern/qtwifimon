@@ -1,0 +1,12 @@
+WifiMon
+=======
+
+Qt Mointor for your wireless and wired network
+
+Install it, using the distutil tool with:
+
+    python setup.py install --root=$where_ever_you_want
+
+Make sure, that the path to the wifimon module is in your PYTHONPATH.
+
+Dependencies: python3, pyqt4, wireless_tools
