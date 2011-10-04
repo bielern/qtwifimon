@@ -1,15 +1,8 @@
-# wifimon 
-# Copyright by Noah Bieler
-#
-"""wifimon
+# Copyright (C) 2011, Noah Bieler
+"""qtwifimon
 
-wifimon monitors your wifi connection and sits in your systray
+qtwifimon monitors your wifi connection and sits in your systray
 """
-
-#__license__ = 'GLP3'
-#__version__ = '0.5'
-#__author__ = 'Noah Bieler'
-#__email__ = 'noah[dot]bieler<at>gmx[dot]ch'
 
 # Imports
 import re       # regular expression
@@ -32,14 +25,9 @@ class Conf:
         self.interval = 1
         self.wired_file = "/sys/class/net/eth0/operstate"
         self.statfile = "/proc/net/wireless"
-        #self.statfile = "test_wlan"
-        #self.statfile = "test_nowlan"
         self.wifiMon_path = os.path.dirname(__file__)
         self.iconPath = os.path.join(self.wifiMon_path, "img")
-        #self.iconPath = "img/"
         self.devfile = "/proc/net/dev"
-        #self.interfaces = []
-        #self.monitor_wired = False
         self.parse_conf_file()
         self.get_interfaces()
 
@@ -59,7 +47,7 @@ class Conf:
         logging.debug("Interfaces found: " + str(self.interfaces))
 
     def print_parser_err(self, option, value):
-        print("Unknown value %s for option %s" % (value, option))
+        logging.error("Unknown value %s for option %s" % (value, option))
 
     def parse_conf_file(self):
         logging.debug("Parse configuration file")
@@ -67,10 +55,10 @@ class Conf:
         if not xdg_home:
             home =  os.getenv("HOME")
             xdg_home = os.path.join(home, ".config")
-        conf_dir = os.path.join(xdg_home, "wifimon")
+        conf_dir = os.path.join(xdg_home, "qtwifimon")
         if not os.path.isdir(conf_dir):
             os.mkdir(conf_dir, 0o755)
-        self.conf_file = os.path.join(conf_dir, "wifimon.rc")
+        self.conf_file = os.path.join(conf_dir, "qtwifimon.rc")
 
         if not os.path.isfile(self.conf_file):
             logging.debug("Will copy default configuration file")
@@ -87,7 +75,7 @@ class Conf:
                 if line:
                     fields = line.split("=")
                     if len(fields) != 2:
-                        print("Error in parsing the configuration file!")
+                        logging.error("Error parsing the configuration file!")
                     else:
                         raw_option = fields[0].lower()
                         raw_value = fields[1].lower()
@@ -105,13 +93,12 @@ class Conf:
                             if os.path.isdir(value):
                                 self.iconPath = value
                             else:
-                                print("Path %s does not exist!" % value)
+                                logging.error("Path %s does not exist!" % value)
                                 exit(1)
                         else:
-                            print("Unkown option %s" % option)
+                            logging.error("Unkown option %s" % option)
                             
                 raw_line = f.readline()
-
         f.close()
 
 conf = Conf()
@@ -144,6 +131,7 @@ class WifiMonitor(QtCore.QObject):
         percentage = -1. However, if a wired connection is found, interface
         will be "eth0" and essid either "up" or "down". Wheter we have wired
         down or wifi depends on the last connection."""
+
         logging.debug("I will update the status")
         percentage = -1
         interface = ""
@@ -239,20 +227,6 @@ class WifiStatusIcon(QtGui.QSystemTrayIcon):
         logging.debug("Will display icon: " + pathToIcon)
 
 
-# Displays the state of the wireless connection
-class WifiStatusWidget(QtGui.QWidget):
-    def __init__(self, parent = None):
-        QtGui.QWidget.__init__(self, parent)
-        logging.debug("Constructed WifiStatusWidget")
-
-    # Display the status
-    def show_wifi_status(self, percentage, interface, essid):
-        if percentage >= 0:
-            logging.info("widget: %s: %s @ %d" % (interface, essid, percentage))
-        else:
-            logging.info("No wifi connection detected!")
-
-
 class WifiMonitorApplication(QtGui.QApplication):
     """The app containing all widgets and the monitoring instance"""
     def __init__(self, args):
@@ -263,18 +237,16 @@ class WifiMonitorApplication(QtGui.QApplication):
         self.status_icon = WifiStatusIcon()
         self.wifi_monitor.signal_display_status.connect(self.status_icon.
                                                         show_wifi_status)
+        signal.signal(signal.SIGINT, self.signal_int_handler)
         self.status_icon.show()
-        
-        #self.status_widget = WifiStatusWidget()
-        #for widget in (self.status_widget, self.status_icon):
-        #    self.wifi_monitor.signal_display_status.connect(widget.show_wifi_status)
-        #    widget.show()
 
     def parse(self):
         parser = argparse.ArgumentParser(
                             description = "Monitors your wifi.",
-                            epilog = """The configurations file can usually be 
-                                     found in ~/.config/wifimon/wifimon.rc""")
+                            epilog = """
+                                     The configurations file can usually be 
+                                     found in ~/.config/qtwifimon/qtwifimon.rc
+                                     """)
         parser.add_argument("-v", "--verbose", 
                             help="set the level of verbosity (default: error)",
                             default="error",
@@ -286,7 +258,7 @@ class WifiMonitorApplication(QtGui.QApplication):
                             nargs=1)
         args = parser.parse_args()
         if args.interval:
-            conf.interval = int(args.interval)
+            conf.interval = args.interval
         if args.verbose:
             if args.verbose == "error":
                 logging.basicConfig(level=logging.ERROR)
@@ -302,12 +274,9 @@ class WifiMonitorApplication(QtGui.QApplication):
         self.instance().quit()
 
 
-#if (__name__ == "__main__"):
 def main():
-    import wifimon
+    import qtwifimon
     app = WifiMonitorApplication(sys.argv)
-    signal.signal(signal.SIGINT, app.signal_int_handler)
     logging.debug("Start GUI")
     app.exec_()
-
 # eof

@@ -1,12 +1,12 @@
 # Contributor: Your Name <youremail@domain.com>
 
-pkgname=wifimon
+pkgname=qtwifimon
 pkgver=0.5
 pkgrel=1
 pkgdesc="Qt monitor for your wireless net"
 arch=(any)
-url="git"
-license=()
+url="http://github.com/bielern/qtwifimon"
+license=('GPL')
 depends=('python', 'pyqt', 'wireless_tools')
 makedepends=('git')
 provides=()
@@ -16,8 +16,8 @@ backup=()
 options=(!emptydirs)
 install=
 
-_gitroot="git://github.com/bielern/wifimon.git"
-_gitname="wifimon"
+_gitroot="git://github.com/bielern/qtwifimon.git"
+_gitname="qtwifimon"
 
 build() {
   cd "$srcdir"
