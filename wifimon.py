@@ -8,6 +8,11 @@
 wifimon monitors your wifi connection and sits in your systray
 """
 
+__license__ = 'GLP3'
+__version__ = '0.5'
+__author__ = 'Noah Bieler'
+__email__ = 'noah[dot]bieler<at>gmx[dot]ch'
+
 # Imports
 import re       # regular expression
 import time     # for sleep()
@@ -30,8 +35,9 @@ class Conf:
         self.wired_file = "/sys/class/net/eth0/operstate"
         self.statfile = "/proc/net/wireless"
         #self.statfile = "test_wlan"
-        self.statfile = "test_nowlan"
-        self.iconPath = "./img/"
+        #self.statfile = "test_nowlan"
+        self.wifiMon_path = os.path.dirname(__file__)
+        self.iconPath = os.path.join(self.wifiMon_path, "img")
         #self.iconPath = "img/"
         self.devfile = "/proc/net/dev"
         #self.interfaces = []
@@ -147,6 +153,7 @@ class WifiMonitor(QtCore.QObject):
             line = f.readline()
         f.close()
 
+        logging.debug(line)
         if line: # wifi
             logging.debug(line)
             m = re.search("(\S+\d):[ ]+(\d+)[ ]+(\d+)\.", line)
@@ -192,7 +199,7 @@ class WifiStatusIcon(QtGui.QSystemTrayIcon):
         self.trayIconMenu = QtGui.QMenu()
         self.trayIconMenu.addAction(self.quitAction)
         self.setContextMenu(self.trayIconMenu)
-        pathToIcon = conf.iconPath + "wifi_none.svg"
+        pathToIcon = os.path.join(conf.iconPath, "wifi_none.svg")
         self.setIcon(QtGui.QIcon(pathToIcon))
 
     def show_wifi_status(self, percentage, interface, essid):
