@@ -154,6 +154,7 @@ class WifiMonitor(QtCore.QObject):
             command = command + " scanning | grep ESSID | cut -d'\"' -f2"
             stdout_handle = os.popen(command)
             essid = stdout_handle.read().strip()
+            stdout_handle.close()
         else: # no wifi
             logging.debug("No Wifi found")
             with open(conf.wired_file) as f:
